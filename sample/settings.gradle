@@ -1,0 +1,6 @@
+rootProject.name = "PAGAndroidSample"
+// 把上级文件夹显示到项目目录来
+include ':pag_root'
+project(':pag_root').projectDir = new File(rootDir.getParent())
+
+include ':app'

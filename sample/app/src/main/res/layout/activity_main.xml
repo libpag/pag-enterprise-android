@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context="libpag.pagviewer.MainActivity">
+
+    <FrameLayout
+            android:id="@+id/container_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    <RadioGroup
+            android:id="@+id/rg_select_pag"
+            android:layout_alignParentTop="true"
+            android:layout_marginBottom="16dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+        <RadioButton
+                android:text="加密素材"
+                android:textColor="@color/colorPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:id="@+id/rb_license" />
+        <RadioButton
+                android:text="音频素材"
+                android:textColor="@color/colorPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:id="@+id/rb_audio" />
+        <RadioButton
+                android:text="替换Movie"
+                android:textColor="@color/colorPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:id="@+id/rb_movie" />
+    </RadioGroup>
+
+    <Button
+            android:text="替换视频"
+            android:onClick="onReplaceClick"
+            android:layout_width="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_height="wrap_content"
+            android:id="@+id/btn_replace"
+            android:layout_above="@+id/btn_export"
+            android:layout_marginBottom="8dp" />
+    <Button
+            android:text="导出视频"
+            android:onClick="onExportClick"
+            android:layout_alignParentEnd="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/btn_export"
+            android:layout_alignParentBottom="true"
+            android:layout_marginBottom="16dp" />
+
+
+</RelativeLayout>
