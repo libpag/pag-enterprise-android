@@ -36,7 +36,6 @@ android {
 dependencies {
 
     implementation 'com.tencent.tav:libpag-enterprise:latest.release'
-    implementation("androidx.exifinterface:exifinterface:1.3.3")
 
     implementation fileTree(dir: 'libs', include: ['*.aar'])
     implementation 'androidx.appcompat:appcompat:1.1.0'

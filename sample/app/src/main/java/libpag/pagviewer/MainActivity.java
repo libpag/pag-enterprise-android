@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
+import org.libpag.PAG;
 import org.libpag.PAGMovieExporter;
 import org.libpag.PAGMovieExporter.Callback;
 import org.libpag.PAGMovieExporter.Status;
@@ -52,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.e(TAG, "onCreate: PAG.SDKVersion() = " + PAG.SDKVersion());
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
         playerView.setRepeatCount(-1);
@@ -162,6 +164,9 @@ public class MainActivity extends AppCompatActivity {
         rgSelectPAG.check(R.id.rb_license);
     }
 
+    /**
+     * 初始化播放器
+     */
     private void preparePlayer() {
         playerView.onRelease();
         FrameLayout containerView = findViewById(R.id.container_view);
@@ -184,6 +189,10 @@ public class MainActivity extends AppCompatActivity {
         playerView.play();
     }
 
+    /**
+     * 加载PAG文件
+     * @return  PAGFile
+     */
     private PAGFile loadPAGFile() {
         PAGFile pagFile = PAGFile.Load(getAssets(), selectedPAGFileName);
         if (pagFile == null) {
@@ -225,6 +234,9 @@ public class MainActivity extends AppCompatActivity {
         return PAGImage.FromPath(datum.mPath);
     }
 
+    /**
+     * 导出视频
+     */
     private void doExport() {
         // 重新构建一个PAGFile
         PAGFile pagFile = loadPAGFile();
@@ -256,14 +268,11 @@ public class MainActivity extends AppCompatActivity {
                             outputFile.delete();
                         }
                     case Complete:
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                // 调用session.release()，及时释放内存, 不能在onStatusChange直接调用，因为session持有callback生命周期
-                                session.release();
-                                session = null;
-                                dialog.dismiss();
-                            }
+                        runOnUiThread(() -> {
+                            // 调用session.release()，及时释放内存, 不能在onStatusChange直接调用，因为session持有callback生命周期
+                            session.release();
+                            session = null;
+                            dialog.dismiss();
                         });
                         break;
                 }
