@@ -36,6 +36,11 @@ android {
 dependencies {
 
     implementation 'com.tencent.tav:libpag-enterprise:latest.release'
+    implementation("androidx.exifinterface:exifinterface:1.3.3")
+//    如果需要视频替换、导出等能力，需要指定带movie的版本，例如：
+//    implementation 'com.tencent.tav:libpag-enterprise:4.2.81-movie'
+//    详细说明请参考wiki：https://github.com/Tencent/libpag/wiki/mobile-sdk-guide
+
 
     implementation fileTree(dir: 'libs', include: ['*.aar'])
     implementation 'androidx.appcompat:appcompat:1.1.0'
