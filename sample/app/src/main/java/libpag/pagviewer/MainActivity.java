@@ -1,37 +1,40 @@
 package libpag.pagviewer;
 
+import android.Manifest;
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.Switch;
 import android.widget.Toast;
-
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-
-import com.tencent.libav.LocalAlbumActivity;
-import com.tencent.libav.PhotoSelectorProxyConsts;
-import com.tencent.libav.model.TinLocalImageInfoBean;
-
+import androidx.core.app.ActivityCompat;
+import com.zhihu.matisse.Matisse;
+import com.zhihu.matisse.MimeType;
+import com.zhihu.matisse.engine.impl.GlideEngine;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-
 import org.libpag.PAG;
-import org.libpag.PAGMovieExporter;
-import org.libpag.PAGMovieExporter.Callback;
-import org.libpag.PAGMovieExporter.Status;
 import org.libpag.PAGFile;
 import org.libpag.PAGImage;
 import org.libpag.PAGLicenseManager;
 import org.libpag.PAGMovie;
+import org.libpag.PAGMovieExporter;
+import org.libpag.PAGMovieExporter.Callback;
+import org.libpag.PAGMovieExporter.Status;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -39,30 +42,49 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_CODE_SELECT = 10086;
     private static final int REQUEST_CODE_PERMISSION = 10010;
-    public static final String DEMO_FILES_DIR = "/sdcard/pag_enterprise_demo/";
-
-
-    private final PAGPlayerView playerView = new PAGPlayerView();
-    private PAGMovieExporter session;
+    private static String DEMO_FILES_DIR;
+    private PAGPlayerView playerView;
+    private PAGMovieExporter exporter;
     private PAGFile pagFile;
     private Runnable onSelectedVideo;
-    private List<TinLocalImageInfoBean> selectData;
+    private List<MediaItem> selectData;
     private String selectedPAGFileName;
     private ProgressDialog dialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.e(TAG, "onCreate: PAG.SDKVersion() = " + PAG.SDKVersion());
+        Log.i(TAG, "onCreate: PAG.SDKVersion() = " + PAG.SDKVersion());
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
-        playerView.setRepeatCount(-1);
-        Utils.CheckStoragePermissions(this, REQUEST_CODE_PERMISSION);
+
+        DEMO_FILES_DIR = getFilesDir() + File.separator + "pag_enterprise_demo" + File.separator;
+        checkStoragePermissions();
+    }
+
+    private void onPermissionsGranted() {
         // SDK鉴权
         initSDKLicense();
         // 添加素材证书
-        initPAGLicense();
-        initRadiaGroup();
+        initFileLicense();
+        initView();
+    }
+
+    private void checkStoragePermissions() {
+        // Check if we have write permission
+        String[] PERMISSIONS_STORAGE = {
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE};
+
+        int checkStoragePermissions = ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION);
+        if (checkStoragePermissions != PackageManager.PERMISSION_GRANTED) {
+            // We don't have permission so prompt the user
+            ActivityCompat.requestPermissions(this, PERMISSIONS_STORAGE, REQUEST_CODE_PERMISSION);
+        } else {
+            Log.i(TAG, "checkStoragePermissions: Granted");
+            onPermissionsGranted();
+        }
     }
 
     /**
@@ -76,13 +98,13 @@ public class MainActivity extends AppCompatActivity {
         String licenseName = "pag_enterprise.license";
 
         File localLicenseFile = new File(licenseDir, licenseName);
-            int licenseResult = PAGLicenseManager.LoadSDKLicense(getApplicationContext(),
-                    localLicenseFile.getAbsolutePath(), licenseAppId, licenseKey);
-            if (PAGLicenseManager.LicenseResultSuccess == licenseResult) {
-                Toast.makeText(MainActivity.this, "鉴权成功", Toast.LENGTH_SHORT).show();
-                // 如果本地鉴权文件存在，并且鉴权成功，直接返回
-                return;
-            }
+        int licenseResult = PAGLicenseManager.LoadSDKLicense(getApplicationContext(),
+                localLicenseFile.getAbsolutePath(), licenseAppId, licenseKey);
+        if (PAGLicenseManager.LicenseResultSuccess == licenseResult) {
+            Toast.makeText(MainActivity.this, "鉴权成功", Toast.LENGTH_SHORT).show();
+            // 如果本地鉴权文件存在，并且鉴权成功，直接返回
+            return;
+        }
         // 使用网络下载鉴权文件
         Downloader.Listener downloadListener = new Downloader.Listener() {
             @Override
@@ -91,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
                         file.getAbsolutePath(), licenseAppId, licenseKey);
                 if (licenseResult != PAGLicenseManager.LicenseResultSuccess) {
                     runOnUiThread(() -> {
-                        String msg = "鉴权失败：result is " +licenseResult;
+                        String msg = "鉴权失败：result is " + licenseResult;
                         Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
                     });
                 }
@@ -106,9 +128,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 添加素材证书
+     * 使用加密素材时需要添加素材证书，否则文件会加载失败，返回nil，建议在APP启动后直接添加，防止加密素材无法使用
      */
-    private void initPAGLicense() {
+    private void initFileLicense() {
         String fileName = "android_demo.license";
         String dirPath = DEMO_FILES_DIR;
         Utils.copyAssets(this, fileName, dirPath);
@@ -126,7 +148,13 @@ public class MainActivity extends AppCompatActivity {
     public void onReplaceClick(View view) {
         int numImages = pagFile.numImages();
         Toast.makeText(this, "请选择1~" + numImages + "个素材", Toast.LENGTH_SHORT).show();
-        LocalAlbumActivity.startChoosePhotoAndVideo(this, numImages, REQUEST_CODE_SELECT);
+        Matisse.from(this)
+                .choose(MimeType.ofAll())
+                .countable(true)
+                .maxSelectable(10)
+                .thumbnailScale(0.85f)
+                .imageEngine(new GlideEngine())
+                .forResult(REQUEST_CODE_SELECT);
         onSelectedVideo = () -> replaceImages(pagFile);
     }
 
@@ -141,8 +169,8 @@ public class MainActivity extends AppCompatActivity {
             dialog.setIndeterminate(false);
             dialog.setCancelable(true);
             dialog.setOnCancelListener(dialogInterface -> {
-                if (session != null) {
-                    session.cancel();
+                if (exporter != null) {
+                    exporter.cancel();
                     Toast.makeText(MainActivity.this, "取消导出", Toast.LENGTH_SHORT).show();
                 }
             });
@@ -151,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
         doExport();
     }
 
-    private void initRadiaGroup() {
+    private void initView() {
         final HashMap<Integer, String> fileMap = new HashMap<>();
         fileMap.put(R.id.rb_license, "3D_BOX_encrypted.pag");
         fileMap.put(R.id.rb_audio, "audio_2.pag");
@@ -161,14 +189,23 @@ public class MainActivity extends AppCompatActivity {
             selectedPAGFileName = fileMap.get(id);
             preparePlayer();
         });
-        rgSelectPAG.check(R.id.rb_license);
+        ((RadioButton) rgSelectPAG.findViewById(R.id.rb_license)).setChecked(true);
+
+        Switch stAudioEnable = findViewById(R.id.st_audio_enable);
+        stAudioEnable.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            playerView.setAudioEnable(isChecked);
+        });
     }
 
     /**
      * 初始化播放器
      */
     private void preparePlayer() {
-        playerView.onRelease();
+        if (playerView != null) {
+            playerView.onRelease();
+        }
+        playerView = new PAGPlayerView();
+        playerView.setRepeatCount(-1);
         FrameLayout containerView = findViewById(R.id.container_view);
         containerView.removeAllViews();
         BackgroundView backgroundView = new BackgroundView(this);
@@ -191,7 +228,8 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * 加载PAG文件
-     * @return  PAGFile
+     *
+     * @return PAGFile
      */
     private PAGFile loadPAGFile() {
         PAGFile pagFile = PAGFile.Load(getAssets(), selectedPAGFileName);
@@ -222,16 +260,16 @@ public class MainActivity extends AppCompatActivity {
 //        }
     }
 
-    private PAGImage makePAGImage(TinLocalImageInfoBean datum) {
+    private PAGImage makePAGImage(MediaItem datum) {
         // 通过选取的素材path构建PAGImage（视频素材需要用PAGMovie构建）
         if (datum.isVideo()) {
-            PAGMovie movie = PAGMovie.MakeFromFile(datum.mPath);
+            PAGMovie movie = PAGMovie.MakeFromFile(datum.getPath());
             if (movie == null) {
                 return null;
             }
             return movie;
         }
-        return PAGImage.FromPath(datum.mPath);
+        return PAGImage.FromPath(datum.getPath());
     }
 
     /**
@@ -246,8 +284,9 @@ public class MainActivity extends AppCompatActivity {
         config.width = pagFile.width();
         config.height = pagFile.height();
         File outputFile = Utils.newFile(DEMO_FILES_DIR + "pag_export/", Utils.getOutputFileName(".mp4"));
+        Log.d(TAG, "doExport: outputFile is:" + outputFile.getAbsolutePath());
         config.outputPath = outputFile.getAbsolutePath();
-        session = PAGMovieExporter.Make(pagFile, config, new Callback() {
+        exporter = PAGMovieExporter.Make(pagFile, config, new Callback() {
             @Override
             public void onProgress(final float progress) {
                 Log.d(TAG, "onProgress() called with: progress = [" + progress + "]");
@@ -268,29 +307,56 @@ public class MainActivity extends AppCompatActivity {
                             outputFile.delete();
                         }
                     case Complete:
+                        Utils.tryCopyVideoToDCIM(MainActivity.this, outputFile.getAbsolutePath());
                         runOnUiThread(() -> {
-                            // 调用session.release()，及时释放内存, 不能在onStatusChange直接调用，因为session持有callback生命周期
-                            session.release();
-                            session = null;
+                            // 调用exporter.release()，及时释放内存, 不能在onStatusChange直接调用，因为exporter持有callback生命周期
+                            exporter.release();
+                            exporter = null;
                             dialog.dismiss();
                         });
                         break;
                 }
             }
         });
-        if (session == null) {
+        if (exporter == null) {
             Toast.makeText(this, "no_movie 版本不包含导出模块", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
             return;
         }
-        session.start();
+        exporter.start();
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_CODE_PERMISSION) {
+            return;
+        }
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            // 如果权限被允许，执行方法
+            onPermissionsGranted();
+        } else {
+            // 如果权限被拒绝，做出相应提示或处理
+            Toast.makeText(MainActivity.this, "未授权存储权限，无法执行操作", Toast.LENGTH_LONG).show();
+            finish();
+        }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_CODE_SELECT && resultCode == RESULT_OK && data != null) {
-            selectData = (ArrayList<TinLocalImageInfoBean>) data
-                    .getSerializableExtra(PhotoSelectorProxyConsts.KEY_SELECTED_DATA);
+            selectData = new ArrayList<>();
+            List<Uri> selectedUris = Matisse.obtainResult(data);
+            for (Uri uri : selectedUris) {
+                String mimeType = getContentResolver().getType(uri);
+                MediaItem.MediaType type = mimeType.startsWith("image/") ?
+                        MediaItem.MediaType.IMAGE :
+                        MediaItem.MediaType.VIDEO;
+                selectData.add(new MediaItem(Utils.getPathFromUri(uri, this), type));
+            }
             Log.i(TAG, "onActivityResult: " + selectData);
             if (onSelectedVideo != null) {
                 onSelectedVideo.run();
@@ -303,9 +369,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         playerView.onRelease();
-        if (session != null) {
-            session.release();
-            session = null;
+        if (exporter != null) {
+            exporter.release();
+            exporter = null;
         }
     }
 

@@ -139,4 +139,10 @@ public class PAGPlayerView {
             mPagView.setRepeatCount(count);
         }
     }
+
+    public void setAudioEnable(boolean audioEnable) {
+        if (mPagView != null) {
+            mPagView.setAudioEnable(audioEnable);
+        }
+    }
 }

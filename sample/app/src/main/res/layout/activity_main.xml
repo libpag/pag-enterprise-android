@@ -8,7 +8,19 @@
     <FrameLayout
             android:id="@+id/container_view"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent" >
+    </FrameLayout>
+
+    <Switch
+            android:text="开启音频"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentEnd="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="8dp"
+            android:textColor="@color/colorPrimary"
+            android:checked="true"
+            android:id="@+id/st_audio_enable" />
 
     <RadioGroup
             android:id="@+id/rg_select_pag"
